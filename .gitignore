@@ -1,0 +1,12 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Упакованное расширение и ключ подписи (не публиковать)
+*.crx
+*.pem
+*.zip
+
+# Node
+node_modules/
