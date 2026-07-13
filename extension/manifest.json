@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Berserk Deck — текст колоды",
-  "version": "1.1.1",
-  "description": "Показывает текстовый вид колоды с berserkdeck.ru и копирует в буфер обмена",
+  "name": "Berserk Deck Importer",
+  "version": "1.2.0",
+  "description": "Показывает текстовый вид колоды или альбома с berserkdeck.ru и копирует в буфер обмена",
   "permissions": ["activeTab", "clipboardWrite", "scripting"],
   "host_permissions": [
     "https://www.berserkdeck.ru/*",
@@ -10,7 +10,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Текст колоды",
+    "default_title": "Berserk Deck Importer",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

@@ -1,7 +1,14 @@
 const contentEl = document.getElementById("content");
 const copyBtn = document.getElementById("copy-btn");
+const titleEl = document.getElementById("title");
 
-let deckText = "";
+let exportText = "";
+
+function setTitle(text) {
+  if (titleEl) {
+    titleEl.textContent = text;
+  }
+}
 
 function showStatus(message, isError = false) {
   contentEl.replaceChildren();
@@ -10,11 +17,11 @@ function showStatus(message, isError = false) {
   p.textContent = message;
   contentEl.appendChild(p);
   copyBtn.disabled = true;
-  deckText = "";
+  exportText = "";
 }
 
-function showDeck(text) {
-  deckText = text;
+function showText(text) {
+  exportText = text;
   contentEl.replaceChildren();
   const pre = document.createElement("pre");
   pre.className = "deck-text";
@@ -25,16 +32,16 @@ function showDeck(text) {
   copyBtn.textContent = "Скопировать";
 }
 
-async function copyDeckText() {
-  if (!deckText) {
+async function copyExportText() {
+  if (!exportText) {
     return;
   }
 
   try {
-    await navigator.clipboard.writeText(deckText);
+    await navigator.clipboard.writeText(exportText);
   } catch {
     const textarea = document.createElement("textarea");
-    textarea.value = deckText;
+    textarea.value = exportText;
     textarea.style.position = "fixed";
     textarea.style.left = "-9999px";
     document.body.appendChild(textarea);
@@ -47,7 +54,7 @@ async function copyDeckText() {
   copyBtn.textContent = "Скопировано!";
 }
 
-async function fetchDeckFromTab(tabId, deckId, code) {
+async function runOnTab(tabId, funcName, args) {
   await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
@@ -57,32 +64,33 @@ async function fetchDeckFromTab(tabId, deckId, code) {
   const [result] = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
-    func: async (deckId, code) => {
+    func: async (funcName, args) => {
       try {
         const bridge = window.__berserkDeckImporter;
-        if (!bridge?.fetchDeck) {
+        const fn = bridge?.[funcName];
+        if (!fn) {
           return {
             ok: false,
             error: "Не удалось инициализировать расширение на странице.",
           };
         }
 
-        const deck = await bridge.fetchDeck(deckId, code);
-        return { ok: true, deck };
+        const data = await fn(...args);
+        return { ok: true, data };
       } catch (error) {
         return {
           ok: false,
-          error: error.message || "Не удалось загрузить колоду.",
+          error: error.message || "Не удалось загрузить данные.",
         };
       }
     },
-    args: [deckId, code],
+    args: [funcName, args],
   });
 
   return result?.result;
 }
 
-copyBtn.addEventListener("click", copyDeckText);
+copyBtn.addEventListener("click", copyExportText);
 
 async function init() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -91,30 +99,45 @@ async function init() {
     return;
   }
 
-  const parsed = parseDeckUrl(tab.url);
+  const parsed = parseBerserkdeckUrl(tab.url);
   if (!parsed) {
     showStatus(
-      "Откройте страницу колоды на berserkdeck.ru\n(например, /decks/53458).",
+      "Откройте страницу колоды или альбома на berserkdeck.ru\n(например, /decks/53458 или /albums/635).",
       true
     );
     return;
   }
 
-  showStatus("Загрузка колоды…");
+  if (parsed.type === "deck") {
+    setTitle("Текст колоды");
+    showStatus("Загрузка колоды…");
 
-  try {
-    const response = await fetchDeckFromTab(
-      tab.id,
+    const response = await runOnTab(tab.id, "fetchDeck", [
       parsed.deckId,
-      parsed.code
-    );
+      parsed.code,
+    ]);
 
     if (!response?.ok) {
       showStatus(response?.error || "Не удалось загрузить колоду.", true);
       return;
     }
 
-    showDeck(formatDeckText(response.deck));
+    showText(formatDeckText(response.data));
+    return;
+  }
+
+  setTitle("Текст альбома");
+  showStatus("Загрузка альбома…");
+
+  try {
+    const response = await runOnTab(tab.id, "fetchAlbum", [parsed.albumId]);
+
+    if (!response?.ok) {
+      showStatus(response?.error || "Не удалось загрузить альбом.", true);
+      return;
+    }
+
+    showText(formatAlbumText(response.data.album, response.data.cards));
   } catch {
     showStatus(
       "Не удалось получить данные со страницы.\nОбновите вкладку berserkdeck.ru и попробуйте снова.",
